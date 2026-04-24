@@ -1,0 +1,31 @@
+{
+  "name": "WellnessLog",
+  "type": "object",
+  "properties": {
+    "log_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date of this log"
+    },
+    "water_glasses": {
+      "type": "number",
+      "description": "Number of glasses of water logged"
+    },
+    "sleep_hours": {
+      "type": "number",
+      "description": "Hours of sleep last night"
+    },
+    "sleep_quality": {
+      "type": "string",
+      "enum": [
+        "poor",
+        "okay",
+        "great"
+      ],
+      "description": "Sleep quality rating"
+    }
+  },
+  "required": [
+    "log_date"
+  ]
+}

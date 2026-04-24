@@ -1,0 +1,10 @@
+{
+  "build": {
+    "builder": "NIXPACKS",
+    "buildCommand": "npm install && npm run build && cd GlowupAi-backend && npm install"
+  },
+  "deploy": {
+    "startCommand": "node GlowupAi-backend/server.js",
+    "restartPolicyType": "ON_FAILURE"
+  }
+}

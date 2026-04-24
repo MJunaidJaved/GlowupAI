@@ -1,0 +1,62 @@
+{
+  "name": "SkinProfile",
+  "type": "object",
+  "properties": {
+    "skin_type": {
+      "type": "string",
+      "enum": [
+        "oily",
+        "dry",
+        "combination",
+        "sensitive"
+      ],
+      "description": "User's skin type"
+    },
+    "skin_concerns": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Array of skin concerns"
+    },
+    "water_intake": {
+      "type": "string",
+      "enum": [
+        "less_than_4",
+        "4_to_6",
+        "7_plus"
+      ],
+      "description": "Daily water intake"
+    },
+    "sleep_hours": {
+      "type": "string",
+      "enum": [
+        "less_than_6",
+        "6_to_7",
+        "8_plus"
+      ],
+      "description": "Hours of sleep per night"
+    },
+    "diet_type": {
+      "type": "string",
+      "enum": [
+        "junk",
+        "mixed",
+        "healthy"
+      ],
+      "description": "Diet quality"
+    },
+    "beauty_goal": {
+      "type": "string",
+      "description": "Primary beauty goal"
+    },
+    "onboarding_complete": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether onboarding is complete"
+    }
+  },
+  "required": [
+    "skin_type"
+  ]
+}

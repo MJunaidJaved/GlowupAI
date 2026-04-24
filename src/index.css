@@ -1,0 +1,122 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400;1,500&family=Jost:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --font-cormorant: 'Cormorant Garamond', serif;
+    --font-jost: 'Jost', sans-serif;
+
+    /* Brand palette */
+    --brand:        #3D5A3E;
+    --brand-light:  #E8EFE8;
+    --brand-mid:    #6B8F6C;
+    --brand-dark:   #2C3E2D;
+    --accent-warm:  #C8A882;
+
+    --page-bg:      #FFFFFF;
+    --section-alt:  #F7F7F5;
+    --card-bg:      #FFFFFF;
+
+    --text-primary:   #1A1F1A;
+    --text-secondary: #5C6B5C;
+    --text-muted:     #9AAA9A;
+
+    --border:       #E2E8E2;
+    --border-em:    #3D5A3E;
+
+    --shadow:       0 2px 16px rgba(61,90,62,0.08);
+    --shadow-hover: 0 8px 32px rgba(61,90,62,0.14);
+
+    /* shadcn tokens */
+    --background: 0 0% 100%;
+    --foreground: 120 6% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 120 6% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 120 6% 11%;
+    --primary: 122 19% 30%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 120 13% 93%;
+    --secondary-foreground: 120 6% 11%;
+    --muted: 60 5% 96%;
+    --muted-foreground: 120 8% 59%;
+    --accent: 120 13% 93%;
+    --accent-foreground: 120 6% 11%;
+    --destructive: 4 67% 47%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 120 12% 89%;
+    --input: 120 12% 89%;
+    --ring: 122 19% 30%;
+    --radius: 0.1875rem;
+
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 120 6% 11%;
+    --sidebar-primary: 122 19% 30%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 120 13% 93%;
+    --sidebar-accent-foreground: 122 19% 30%;
+    --sidebar-border: 120 12% 89%;
+    --sidebar-ring: 122 19% 30%;
+  }
+}
+
+@layer base {
+  * { @apply border-border outline-ring/50; }
+  body { @apply bg-white font-jost; color: #1A1F1A; }
+}
+
+/* ── Typing indicator ── */
+@keyframes typing-wave {
+  0%,60%,100%{transform:translateY(0);opacity:.4}
+  30%{transform:translateY(-6px);opacity:1}
+}
+.typing-dot-1{animation:typing-wave 1.2s ease-in-out infinite 0s}
+.typing-dot-2{animation:typing-wave 1.2s ease-in-out infinite .15s}
+.typing-dot-3{animation:typing-wave 1.2s ease-in-out infinite .3s}
+
+/* ── Online pulse dot ── */
+@keyframes pulse-dot {
+  0%,100%{transform:scale(1);opacity:1}
+  50%{transform:scale(1.5);opacity:.6}
+}
+.pulse-dot { animation: pulse-dot 2s ease-in-out infinite; }
+
+/* ── Custom scrollbar ── */
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#C8A882;border-radius:20px}
+
+.no-scrollbar::-webkit-scrollbar{display:none}
+.no-scrollbar{-ms-overflow-style:none;scrollbar-width:none}
+
+/* ── Slider styling ── */
+input[type='range'].green-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 3px;
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+input[type='range'].green-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid #3D5A3E;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(61,90,62,0.2);
+}
+input[type='range'].green-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid #3D5A3E;
+  cursor: pointer;
+}

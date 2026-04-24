@@ -1,0 +1,17 @@
+{
+  "name": "ChatSession",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "Chat session title"
+    },
+    "last_message_preview": {
+      "type": "string",
+      "description": "Preview of the last message"
+    }
+  },
+  "required": [
+    "title"
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "name": "ChatMessage",
+  "type": "object",
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "description": "Reference to the chat session"
+    },
+    "role": {
+      "type": "string",
+      "enum": [
+        "user",
+        "ai"
+      ],
+      "description": "Who sent the message"
+    },
+    "message_text": {
+      "type": "string",
+      "description": "The message content"
+    }
+  },
+  "required": [
+    "session_id",
+    "role",
+    "message_text"
+  ]
+}

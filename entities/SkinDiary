@@ -1,0 +1,33 @@
+{
+  "name": "SkinDiary",
+  "type": "object",
+  "properties": {
+    "entry_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date of this entry"
+    },
+    "mood": {
+      "type": "string",
+      "enum": [
+        "glowing",
+        "good",
+        "okay",
+        "dry",
+        "breaking_out"
+      ],
+      "description": "Skin mood for the day"
+    },
+    "skin_notes": {
+      "type": "string",
+      "description": "How skin feels today, products used"
+    },
+    "lifestyle_notes": {
+      "type": "string",
+      "description": "Food, drink, lifestyle notes"
+    }
+  },
+  "required": [
+    "entry_date"
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "name": "GlowProgress",
+  "type": "object",
+  "properties": {
+    "week_date": {
+      "type": "string",
+      "format": "date",
+      "description": "The Monday of the week this check-in is for"
+    },
+    "acne_level": {
+      "type": "number",
+      "description": "1-10 scale"
+    },
+    "hydration": {
+      "type": "number",
+      "description": "1-10 scale"
+    },
+    "glow": {
+      "type": "number",
+      "description": "1-10 scale"
+    },
+    "redness": {
+      "type": "number",
+      "description": "1-10 scale"
+    },
+    "texture": {
+      "type": "number",
+      "description": "1-10 scale"
+    },
+    "dark_spots": {
+      "type": "number",
+      "description": "1-10 scale"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Optional weekly notes"
+    }
+  },
+  "required": [
+    "week_date"
+  ]
+}

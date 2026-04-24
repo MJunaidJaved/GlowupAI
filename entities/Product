@@ -1,0 +1,62 @@
+{
+  "name": "Product",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Product name"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "cleanser",
+        "toner",
+        "serum",
+        "moisturizer",
+        "spf",
+        "mask",
+        "exfoliant",
+        "eye_cream"
+      ],
+      "description": "Product category"
+    },
+    "description": {
+      "type": "string",
+      "description": "Product description"
+    },
+    "skin_types": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Suitable skin types"
+    },
+    "concerns": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Skin concerns this product addresses"
+    },
+    "key_ingredients": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Key active ingredients"
+    },
+    "price_range": {
+      "type": "string",
+      "enum": [
+        "budget",
+        "mid",
+        "premium"
+      ],
+      "description": "Price range"
+    }
+  },
+  "required": [
+    "name",
+    "category"
+  ]
+}

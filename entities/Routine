@@ -1,0 +1,39 @@
+{
+  "name": "Routine",
+  "type": "object",
+  "properties": {
+    "routine_type": {
+      "type": "string",
+      "enum": [
+        "am",
+        "pm"
+      ],
+      "description": "Morning or evening routine"
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "order": {
+            "type": "number"
+          },
+          "product_type": {
+            "type": "string"
+          },
+          "product_name": {
+            "type": "string"
+          },
+          "instruction": {
+            "type": "string"
+          }
+        }
+      },
+      "description": "Ordered routine steps"
+    }
+  },
+  "required": [
+    "routine_type",
+    "steps"
+  ]
+}

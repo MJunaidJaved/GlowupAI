@@ -1,0 +1,21 @@
+{
+  "name": "DailyChecklist",
+  "type": "object",
+  "properties": {
+    "date": {
+      "type": "string",
+      "format": "date",
+      "description": "The date of the checklist"
+    },
+    "completed_steps": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Array of completed step identifiers"
+    }
+  },
+  "required": [
+    "date"
+  ]
+}
