@@ -8,11 +8,26 @@ const rateLimit = require('express-rate-limit')
 const app = express()
 
 // Security headers
-app.use(helmet())
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      imgSrc: ["'self'", "data:", "https:", "http:", "blob:"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      connectSrc: ["'self'", "https:", "http:", "wss:"],
+      fontSrc: ["'self'", "https:", "data:"],
+      mediaSrc: ["'self'", "https:", "data:"],
+    },
+  },
+  crossOriginEmbedderPolicy: false,
+}));
 
 // CORS — allow your frontend to talk to this server
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: function(origin, callback) {
+    callback(null, true);
+  },
   credentials: true
 }))
 
