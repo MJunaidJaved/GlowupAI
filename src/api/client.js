@@ -10,7 +10,7 @@ const apiRequest = async (method, endpoint, body = null) => {
   const config = { method, headers }
   if (body) config.body = JSON.stringify(body)
 
-  const response = await fetch(`${API_URL}${endpoint}`, config)
+  const response = await fetch(`${API_BASE}${endpoint}`, config)
   const data = await response.json()
 
   if (!response.ok) throw new Error(data.error || 'Request failed')
