@@ -192,11 +192,12 @@ export default function Chat() {
   }, [messages, typingSessionId]);
 
   const sendMessage = useMutation({
-    mutationFn: async ({ text, originSessionId, retriedAfterSessionReset = false }) => {
+    mutationFn: async ({ text, originSessionId }) => {
       let targetSessionId = originSessionId;
       if (!targetSessionId) {
         const session = await api.post('/api/chat/sessions', { title: text.slice(0, 50) });
         targetSessionId = session.id;
+        // New chat send should always activate the newly created thread.
         updateActiveSessionId(targetSessionId);
         queryClient.invalidateQueries({ queryKey: ['chatSessions', user?.email] });
       }
@@ -217,38 +218,17 @@ export default function Chat() {
       await api.put(`/api/chat/sessions/${targetSessionId}`, { last_message_preview: text.slice(0, 80) });
       return {
         targetSessionId: String(targetSessionId),
-        originSessionId: originSessionId ? String(originSessionId) : null,
-        retriedAfterSessionReset
+        originSessionId: originSessionId ? String(originSessionId) : null
       };
     },
     onSuccess: ({ targetSessionId }) => {
       queryClient.invalidateQueries({ queryKey: ['chatMessages', targetSessionId] });
       queryClient.invalidateQueries({ queryKey: ['chatSessions', user?.email] });
-      if (String(activeSessionId ?? '') !== String(targetSessionId)) {
-        toast({
-          title: 'Reply ready',
-          description: 'Your response was added to the original chat thread.',
-        });
-      }
     },
-    onError: (error, variables) => {
-      if (isSessionNotFoundError(error) && !variables?.retriedAfterSessionReset) {
-        updateActiveSessionId(null);
-        if (sessionStorageKey) {
-          localStorage.removeItem(sessionStorageKey);
-        }
-        toast({
-          title: 'Chat refreshed',
-          description: 'Previous chat no longer exists. Retrying in a new chat...',
-        });
-        sendMessage.mutate({
-          text: variables?.text || '',
-          originSessionId: null,
-          retriedAfterSessionReset: true,
-        });
-        return;
+    onError: (error) => {
+      if (isSessionNotFoundError(error) && sessionStorageKey) {
+        localStorage.removeItem(sessionStorageKey);
       }
-
       toast({
         title: 'Message failed',
         description: getFriendlySendErrorMessage(error),
