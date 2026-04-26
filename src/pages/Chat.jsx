@@ -114,11 +114,13 @@ export default function Chat() {
   const queryClient = useQueryClient();
   const [activeSessionId, setActiveSessionId] = useState(null);
   const [typingSessionId, setTypingSessionId] = useState(null);
+  const [isCreatingSession, setIsCreatingSession] = useState(false);
   const [message, setMessage] = useState('');
   const [profile, setProfile] = useState(null);
   const [user, setUser] = useState(null);
   const messagesEndRef = useRef(null);
   const activeSessionIdRef = useRef(null);
+  const sessionCreationPromiseRef = useRef(null);
   const sessionStorageKey = user?.email ? `chat:lastSession:${user.email}` : null;
 
   const updateActiveSessionId = (sessionId) => {
@@ -191,16 +193,34 @@ export default function Chat() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, typingSessionId]);
 
+  const ensureSession = async (titleHint = 'New Chat') => {
+    const currentSessionId = activeSessionIdRef.current;
+    if (currentSessionId) return currentSessionId;
+
+    if (sessionCreationPromiseRef.current) {
+      return sessionCreationPromiseRef.current;
+    }
+
+    setIsCreatingSession(true);
+    sessionCreationPromiseRef.current = api
+      .post('/api/chat/sessions', { title: titleHint.slice(0, 50) })
+      .then((session) => {
+        const createdId = String(session.id);
+        updateActiveSessionId(createdId);
+        queryClient.invalidateQueries({ queryKey: ['chatSessions', user?.email] });
+        return createdId;
+      })
+      .finally(() => {
+        setIsCreatingSession(false);
+        sessionCreationPromiseRef.current = null;
+      });
+
+    return sessionCreationPromiseRef.current;
+  };
+
   const sendMessage = useMutation({
     mutationFn: async ({ text, originSessionId }) => {
-      let targetSessionId = originSessionId;
-      if (!targetSessionId) {
-        const session = await api.post('/api/chat/sessions', { title: text.slice(0, 50) });
-        targetSessionId = session.id;
-        // New chat send should always activate the newly created thread.
-        updateActiveSessionId(targetSessionId);
-        queryClient.invalidateQueries({ queryKey: ['chatSessions', user?.email] });
-      }
+      const targetSessionId = originSessionId || await ensureSession(text);
       await api.post(`/api/chat/sessions/${targetSessionId}/messages`, { role: 'user', message_text: text });
       queryClient.invalidateQueries({ queryKey: ['chatMessages', targetSessionId] });
       setTypingSessionId(String(targetSessionId));
@@ -273,16 +293,27 @@ export default function Chat() {
 
   const handleSend = () => {
     const t = message.trim();
-    if (!t || sendMessage.isPending) return;
+    if (!t || sendMessage.isPending || isCreatingSession) return;
     const originSessionId = activeSessionIdRef.current;
     setMessage('');
     sendMessage.mutate({ text: t, originSessionId });
   };
 
   const handleSuggestionClick = (text) => {
-    if (sendMessage.isPending) return;
+    if (sendMessage.isPending || isCreatingSession) return;
     const originSessionId = activeSessionIdRef.current;
     sendMessage.mutate({ text, originSessionId });
+  };
+
+  const handleInputFocus = () => {
+    if (!activeSessionIdRef.current && !isCreatingSession) {
+      ensureSession('New Chat').catch(() => {
+        toast({
+          title: 'Message failed',
+          description: 'Could not prepare chat session. Please try again.',
+        });
+      });
+    }
   };
 
   const isTypingForActiveSession =
@@ -295,7 +326,15 @@ export default function Chat() {
           sessions={sessions}
           activeId={activeSessionId}
           onSelect={handleSelectSession}
-          onNew={handleNewChat}
+          onNew={() => {
+            handleNewChat();
+            ensureSession('New Chat').catch(() => {
+              toast({
+                title: 'Message failed',
+                description: 'Could not create a new chat. Please try again.',
+              });
+            });
+          }}
           onDelete={handleDeleteSession}
           deletingSessionId={deleteSession.isPending ? deleteSession.variables : null}
         />
@@ -386,8 +425,9 @@ export default function Chat() {
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                onFocus={handleInputFocus}
                 placeholder="Ask me anything about your skin..."
-                disabled={sendMessage.isPending}
+                disabled={sendMessage.isPending || isCreatingSession}
                 className="flex-1 font-jost text-sm"
                 style={{
                   height: 48,
@@ -404,7 +444,7 @@ export default function Chat() {
               />
               <motion.button
                 onClick={handleSend}
-                disabled={sendMessage.isPending || !message.trim()}
+                disabled={sendMessage.isPending || isCreatingSession || !message.trim()}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.95 }}
                 className="flex items-center justify-center text-white flex-shrink-0 disabled:opacity-50"
