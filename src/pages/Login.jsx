@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import PageTransition from '../components/shared/PageTransition';
 
@@ -12,6 +13,7 @@ export default function Login() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -94,15 +96,27 @@ export default function Login() {
               <label className="block font-jost text-xs font-medium mb-1.5" style={{ color: '#5C6B5C' }}>
                 Password
               </label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder={isSignUp ? 'At least 8 characters' : 'Your password'}
-                required
-                className="w-full px-4 py-3 rounded-[3px] font-jost text-sm border focus:outline-none focus:ring-2 focus:ring-[#3D5A3E]/30"
-                style={{ background: '#fff', borderColor: '#E2E8E2', color: '#1A1F1A' }}
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder={isSignUp ? 'At least 8 characters' : 'Your password'}
+                  required
+                  className="w-full px-4 py-3 pr-11 rounded-[3px] font-jost text-sm border focus:outline-none focus:ring-2 focus:ring-[#3D5A3E]/30"
+                  style={{ background: '#fff', borderColor: '#E2E8E2', color: '#1A1F1A' }}
+                />
+                <button
+                  type="button"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  aria-pressed={showPassword}
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2"
+                  style={{ color: '#5C6B5C' }}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
 
             {error && (

@@ -4,12 +4,15 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
-import { Plus, Send, Sparkles } from 'lucide-react';
+import { Plus, Send, Sparkles, Trash2 } from 'lucide-react';
 import PageTransition from '../components/shared/PageTransition';
 import ChatBubble from '../components/chat/ChatBubble';
 import TypingIndicator from '../components/shared/TypingIndicator';
 
-function ChatSessionSidebar({ sessions, activeId, onSelect, onNew }) {
+function ChatSessionSidebar({ sessions, activeId, onSelect, onNew, onDelete, deletingSessionId }) {
+  const normalizedActiveId = activeId != null ? String(activeId) : null;
+  const normalizedDeletingId = deletingSessionId != null ? String(deletingSessionId) : null;
+
   return (
     <div className="hidden lg:flex flex-col bg-white h-full" style={{ width: 280, minWidth: 280, borderRight: '1px solid #E2E8E2' }}>
       <div className="flex items-center justify-between p-5" style={{ borderBottom: '1px solid #E2E8E2' }}>
@@ -26,25 +29,45 @@ function ChatSessionSidebar({ sessions, activeId, onSelect, onNew }) {
       </div>
       <div className="flex-1 overflow-y-auto p-3 space-y-1">
         {sessions.map((s) => (
-          <button
+          <div
             key={s.id}
-            onClick={() => onSelect(s.id)}
-            className="w-full text-left p-3 transition-all duration-150"
+            className="w-full p-3 transition-all duration-150"
             style={{
               borderRadius: 3,
-              borderLeft: activeId === s.id ? '3px solid #3D5A3E' : '3px solid transparent',
-              background: activeId === s.id ? '#E8EFE8' : 'transparent',
+              borderLeft: normalizedActiveId === String(s.id) ? '3px solid #3D5A3E' : '3px solid transparent',
+              background: normalizedActiveId === String(s.id) ? '#E8EFE8' : 'transparent',
             }}
-            onMouseEnter={(e) => { if (activeId !== s.id) e.currentTarget.style.background = '#F7F7F5'; }}
-            onMouseLeave={(e) => { if (activeId !== s.id) e.currentTarget.style.background = 'transparent'; }}
+            onMouseEnter={(e) => { if (normalizedActiveId !== String(s.id)) e.currentTarget.style.background = '#F7F7F5'; }}
+            onMouseLeave={(e) => { if (normalizedActiveId !== String(s.id)) e.currentTarget.style.background = 'transparent'; }}
           >
-            <p className="font-jost text-sm font-medium truncate" style={{ color: '#1A1F1A' }}>
-              {s.title?.slice(0, 30) || 'New Chat'}
-            </p>
-            <p className="font-jost mt-0.5" style={{ fontSize: 11, color: '#9AAA9A' }}>
-              {s.created_date ? format(new Date(s.created_date), 'MMM d, h:mm a') : ''}
-            </p>
-          </button>
+            <div className="flex items-start justify-between gap-2">
+              <button
+                onClick={() => onSelect(s.id)}
+                className="text-left min-w-0 flex-1"
+              >
+                <p className="font-jost text-sm font-medium truncate" style={{ color: '#1A1F1A' }}>
+                  {s.title?.slice(0, 30) || 'New Chat'}
+                </p>
+                <p className="font-jost mt-0.5" style={{ fontSize: 11, color: '#9AAA9A' }}>
+                  {s.created_date ? format(new Date(s.created_date), 'MMM d, h:mm a') : ''}
+                </p>
+              </button>
+              <button
+                type="button"
+                aria-label="Delete chat"
+                title="Delete chat"
+                disabled={normalizedDeletingId === String(s.id)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(s.id);
+                }}
+                className="mt-0.5 p-1 disabled:opacity-50"
+                style={{ color: '#9AAA9A' }}
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
         ))}
         {sessions.length === 0 && (
           <p className="font-jost text-sm text-center py-10" style={{ color: '#9AAA9A' }}>No chats yet</p>
@@ -70,6 +93,7 @@ export default function Chat() {
   const [profile, setProfile] = useState(null);
   const [user, setUser] = useState(null);
   const messagesEndRef = useRef(null);
+  const sessionStorageKey = user?.email ? `chat:lastSession:${user.email}` : null;
 
   useEffect(() => {
     api.get('/api/auth/me').then((u) => {
@@ -83,6 +107,34 @@ export default function Chat() {
     queryFn: () => user ? api.get('/api/chat/sessions') : [],
     enabled: !!user,
   });
+
+  useEffect(() => {
+    if (!sessionStorageKey) return;
+    const storedSessionId = localStorage.getItem(sessionStorageKey);
+    if (storedSessionId) {
+      setActiveSessionId(storedSessionId);
+    }
+  }, [sessionStorageKey]);
+
+  useEffect(() => {
+    if (!sessionStorageKey) return;
+    if (activeSessionId) {
+      localStorage.setItem(sessionStorageKey, activeSessionId);
+    } else {
+      localStorage.removeItem(sessionStorageKey);
+    }
+  }, [activeSessionId, sessionStorageKey]);
+
+  useEffect(() => {
+    if (!activeSessionId || sessions.length === 0) return;
+    const isActiveSessionValid = sessions.some((session) => String(session.id) === String(activeSessionId));
+    if (!isActiveSessionValid) {
+      setActiveSessionId(null);
+      if (sessionStorageKey) {
+        localStorage.removeItem(sessionStorageKey);
+      }
+    }
+  }, [activeSessionId, sessions, sessionStorageKey]);
 
   const { data: messages = [] } = useQuery({
     queryKey: ['chatMessages', activeSessionId],
@@ -126,6 +178,29 @@ export default function Chat() {
     },
   });
 
+  const deleteSession = useMutation({
+    mutationFn: async (sessionId) => {
+      await api.delete(`/api/chat/sessions/${sessionId}`);
+      return sessionId;
+    },
+    onSuccess: (deletedSessionId) => {
+      if (String(deletedSessionId) === String(activeSessionId)) {
+        setActiveSessionId(null);
+      }
+      if (sessionStorageKey && String(deletedSessionId) === localStorage.getItem(sessionStorageKey)) {
+        localStorage.removeItem(sessionStorageKey);
+      }
+      queryClient.invalidateQueries({ queryKey: ['chatSessions', user?.email] });
+      queryClient.removeQueries({ queryKey: ['chatMessages', deletedSessionId] });
+    },
+  });
+
+  const handleDeleteSession = (sessionId) => {
+    const shouldDelete = window.confirm('Delete this chat permanently?');
+    if (!shouldDelete || deleteSession.isPending) return;
+    deleteSession.mutate(sessionId);
+  };
+
   const handleSend = () => {
     const t = message.trim();
     if (!t || sendMessage.isPending) return;
@@ -141,6 +216,8 @@ export default function Chat() {
           activeId={activeSessionId}
           onSelect={setActiveSessionId}
           onNew={() => setActiveSessionId(null)}
+          onDelete={handleDeleteSession}
+          deletingSessionId={deleteSession.isPending ? deleteSession.variables : null}
         />
 
         <div className="flex-1 flex flex-col h-full overflow-hidden">
