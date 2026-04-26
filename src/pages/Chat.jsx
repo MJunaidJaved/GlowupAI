@@ -89,7 +89,7 @@ const SUGGESTIONS = [
 export default function Chat() {
   const queryClient = useQueryClient();
   const [activeSessionId, setActiveSessionId] = useState(null);
-  const [isTyping, setIsTyping] = useState(false);
+  const [typingSessionId, setTypingSessionId] = useState(null);
   const [message, setMessage] = useState('');
   const [profile, setProfile] = useState(null);
   const [user, setUser] = useState(null);
@@ -147,20 +147,20 @@ export default function Chat() {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isTyping]);
+  }, [messages, typingSessionId]);
 
   const sendMessage = useMutation({
-    mutationFn: async (text) => {
-      let sessionId = activeSessionId;
-      if (!sessionId) {
+    mutationFn: async ({ text, originSessionId }) => {
+      let targetSessionId = originSessionId;
+      if (!targetSessionId) {
         const session = await api.post('/api/chat/sessions', { title: text.slice(0, 50) });
-        sessionId = session.id;
-        setActiveSessionId(sessionId);
+        targetSessionId = session.id;
+        setActiveSessionId(targetSessionId);
         queryClient.invalidateQueries({ queryKey: ['chatSessions', user?.email] });
       }
-      await api.post(`/api/chat/sessions/${sessionId}/messages`, { role: 'user', message_text: text });
-      queryClient.invalidateQueries({ queryKey: ['chatMessages', sessionId] });
-      setIsTyping(true);
+      await api.post(`/api/chat/sessions/${targetSessionId}/messages`, { role: 'user', message_text: text });
+      queryClient.invalidateQueries({ queryKey: ['chatMessages', targetSessionId] });
+      setTypingSessionId(String(targetSessionId));
 
       const skinContext = profile
         ? `Skin type: ${profile.skin_type}. Concerns: ${(profile.skin_concerns || []).join(', ')}. Goal: ${profile.beauty_goal}. Water: ${profile.water_intake}. Sleep: ${profile.sleep_hours}. Diet: ${profile.diet_type}.`
@@ -171,11 +171,28 @@ export default function Chat() {
         skin_context: skinContext
       });
 
-      setIsTyping(false);
-      await api.post(`/api/chat/sessions/${sessionId}/messages`, { role: 'ai', message_text: response.message });
-      await api.put(`/api/chat/sessions/${sessionId}`, { last_message_preview: text.slice(0, 80) });
-      queryClient.invalidateQueries({ queryKey: ['chatMessages', sessionId] });
+      await api.post(`/api/chat/sessions/${targetSessionId}/messages`, { role: 'ai', message_text: response.message });
+      await api.put(`/api/chat/sessions/${targetSessionId}`, { last_message_preview: text.slice(0, 80) });
+      return { targetSessionId: String(targetSessionId), originSessionId: originSessionId ? String(originSessionId) : null };
+    },
+    onSuccess: ({ targetSessionId }) => {
+      queryClient.invalidateQueries({ queryKey: ['chatMessages', targetSessionId] });
       queryClient.invalidateQueries({ queryKey: ['chatSessions', user?.email] });
+      if (String(activeSessionId ?? '') !== String(targetSessionId)) {
+        toast({
+          title: 'Reply ready',
+          description: 'Your response was added to the original chat thread.',
+        });
+      }
+    },
+    onError: () => {
+      toast({
+        title: 'Message failed',
+        description: 'Could not get AI response. Please try again.',
+      });
+    },
+    onSettled: () => {
+      setTypingSessionId(null);
     },
   });
 
@@ -214,9 +231,19 @@ export default function Chat() {
   const handleSend = () => {
     const t = message.trim();
     if (!t || sendMessage.isPending) return;
+    const originSessionId = activeSessionId;
     setMessage('');
-    sendMessage.mutate(t);
+    sendMessage.mutate({ text: t, originSessionId });
   };
+
+  const handleSuggestionClick = (text) => {
+    if (sendMessage.isPending) return;
+    const originSessionId = activeSessionId;
+    sendMessage.mutate({ text, originSessionId });
+  };
+
+  const isTypingForActiveSession =
+    typingSessionId != null && String(activeSessionId ?? '') === String(typingSessionId);
 
   return (
     <PageTransition>
@@ -250,7 +277,7 @@ export default function Chat() {
           {/* Messages */}
           <div className="flex-1 overflow-y-auto px-6 py-6" style={{ background: '#FAFAFA' }}>
             <AnimatePresence>
-              {messages.length === 0 && !isTyping && (
+              {messages.length === 0 && !isTypingForActiveSession && (
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -271,7 +298,7 @@ export default function Chat() {
               <ChatBubble key={msg.id} message={msg} />
             ))}
 
-            {isTyping && (
+            {isTypingForActiveSession && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-3 mb-4">
                 <div className="w-8 h-8 rounded-full bg-lavender-chat flex items-center justify-center flex-shrink-0">
                   <span className="text-xs text-deep-mauve">✦</span>
@@ -296,7 +323,7 @@ export default function Chat() {
                   {SUGGESTIONS.map((s) => (
                     <button
                       key={s.personalized}
-                      onClick={() => sendMessage.mutate(profile ? s.personalized : s.generic)}
+                      onClick={() => handleSuggestionClick(profile ? s.personalized : s.generic)}
                       disabled={sendMessage.isPending}
                       className="flex-shrink-0 font-jost transition-all duration-150"
                       style={{ padding: '6px 14px', border: '1px solid #E2E8E2', borderRadius: 3, fontSize: 11, color: '#5C6B5C', background: '#fff', whiteSpace: 'nowrap' }}
