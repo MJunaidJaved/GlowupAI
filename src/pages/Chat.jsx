@@ -8,6 +8,7 @@ import { Plus, Send, Sparkles, Trash2 } from 'lucide-react';
 import PageTransition from '../components/shared/PageTransition';
 import ChatBubble from '../components/chat/ChatBubble';
 import TypingIndicator from '../components/shared/TypingIndicator';
+import { toast } from '@/components/ui/use-toast';
 
 function ChatSessionSidebar({ sessions, activeId, onSelect, onNew, onDelete, deletingSessionId }) {
   const normalizedActiveId = activeId != null ? String(activeId) : null;
@@ -192,12 +193,21 @@ export default function Chat() {
       }
       queryClient.invalidateQueries({ queryKey: ['chatSessions', user?.email] });
       queryClient.removeQueries({ queryKey: ['chatMessages', deletedSessionId] });
+      toast({
+        title: 'Chat deleted',
+        description: 'The conversation was removed successfully.',
+      });
+    },
+    onError: () => {
+      toast({
+        title: 'Delete failed',
+        description: 'Could not delete this chat. Please try again.',
+      });
     },
   });
 
   const handleDeleteSession = (sessionId) => {
-    const shouldDelete = window.confirm('Delete this chat permanently?');
-    if (!shouldDelete || deleteSession.isPending) return;
+    if (deleteSession.isPending) return;
     deleteSession.mutate(sessionId);
   };
 
