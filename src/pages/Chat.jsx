@@ -31,6 +31,9 @@ const getFriendlySendErrorMessage = (error) => {
   return 'Could not send message right now. Please try again.';
 };
 
+const isSessionNotFoundError = (error) =>
+  (error?.message || '').toLowerCase().includes('session not found');
+
 function ChatSessionSidebar({ sessions, activeId, onSelect, onNew, onDelete, deletingSessionId }) {
   const normalizedActiveId = activeId != null ? String(activeId) : null;
   const normalizedDeletingId = deletingSessionId != null ? String(deletingSessionId) : null;
@@ -115,7 +118,25 @@ export default function Chat() {
   const [profile, setProfile] = useState(null);
   const [user, setUser] = useState(null);
   const messagesEndRef = useRef(null);
+  const activeSessionIdRef = useRef(null);
   const sessionStorageKey = user?.email ? `chat:lastSession:${user.email}` : null;
+
+  const updateActiveSessionId = (sessionId) => {
+    activeSessionIdRef.current = sessionId;
+    setActiveSessionId(sessionId);
+  };
+
+  const handleSelectSession = (sessionId) => {
+    updateActiveSessionId(sessionId);
+  };
+
+  const handleNewChat = () => {
+    updateActiveSessionId(null);
+  };
+
+  useEffect(() => {
+    activeSessionIdRef.current = activeSessionId;
+  }, [activeSessionId]);
 
   useEffect(() => {
     api.get('/api/auth/me').then((u) => {
@@ -134,7 +155,7 @@ export default function Chat() {
     if (!sessionStorageKey) return;
     const storedSessionId = localStorage.getItem(sessionStorageKey);
     if (storedSessionId) {
-      setActiveSessionId(storedSessionId);
+      updateActiveSessionId(storedSessionId);
     }
   }, [sessionStorageKey]);
 
@@ -151,7 +172,7 @@ export default function Chat() {
     if (!activeSessionId || sessions.length === 0) return;
     const isActiveSessionValid = sessions.some((session) => String(session.id) === String(activeSessionId));
     if (!isActiveSessionValid) {
-      setActiveSessionId(null);
+      updateActiveSessionId(null);
       if (sessionStorageKey) {
         localStorage.removeItem(sessionStorageKey);
       }
@@ -171,12 +192,12 @@ export default function Chat() {
   }, [messages, typingSessionId]);
 
   const sendMessage = useMutation({
-    mutationFn: async ({ text, originSessionId }) => {
+    mutationFn: async ({ text, originSessionId, retriedAfterSessionReset = false }) => {
       let targetSessionId = originSessionId;
       if (!targetSessionId) {
         const session = await api.post('/api/chat/sessions', { title: text.slice(0, 50) });
         targetSessionId = session.id;
-        setActiveSessionId(targetSessionId);
+        updateActiveSessionId(targetSessionId);
         queryClient.invalidateQueries({ queryKey: ['chatSessions', user?.email] });
       }
       await api.post(`/api/chat/sessions/${targetSessionId}/messages`, { role: 'user', message_text: text });
@@ -194,7 +215,11 @@ export default function Chat() {
 
       await api.post(`/api/chat/sessions/${targetSessionId}/messages`, { role: 'ai', message_text: response.message });
       await api.put(`/api/chat/sessions/${targetSessionId}`, { last_message_preview: text.slice(0, 80) });
-      return { targetSessionId: String(targetSessionId), originSessionId: originSessionId ? String(originSessionId) : null };
+      return {
+        targetSessionId: String(targetSessionId),
+        originSessionId: originSessionId ? String(originSessionId) : null,
+        retriedAfterSessionReset
+      };
     },
     onSuccess: ({ targetSessionId }) => {
       queryClient.invalidateQueries({ queryKey: ['chatMessages', targetSessionId] });
@@ -206,7 +231,24 @@ export default function Chat() {
         });
       }
     },
-    onError: (error) => {
+    onError: (error, variables) => {
+      if (isSessionNotFoundError(error) && !variables?.retriedAfterSessionReset) {
+        updateActiveSessionId(null);
+        if (sessionStorageKey) {
+          localStorage.removeItem(sessionStorageKey);
+        }
+        toast({
+          title: 'Chat refreshed',
+          description: 'Previous chat no longer exists. Retrying in a new chat...',
+        });
+        sendMessage.mutate({
+          text: variables?.text || '',
+          originSessionId: null,
+          retriedAfterSessionReset: true,
+        });
+        return;
+      }
+
       toast({
         title: 'Message failed',
         description: getFriendlySendErrorMessage(error),
@@ -224,7 +266,7 @@ export default function Chat() {
     },
     onSuccess: (deletedSessionId) => {
       if (String(deletedSessionId) === String(activeSessionId)) {
-        setActiveSessionId(null);
+        updateActiveSessionId(null);
       }
       if (sessionStorageKey && String(deletedSessionId) === localStorage.getItem(sessionStorageKey)) {
         localStorage.removeItem(sessionStorageKey);
@@ -252,14 +294,14 @@ export default function Chat() {
   const handleSend = () => {
     const t = message.trim();
     if (!t || sendMessage.isPending) return;
-    const originSessionId = activeSessionId;
+    const originSessionId = activeSessionIdRef.current;
     setMessage('');
     sendMessage.mutate({ text: t, originSessionId });
   };
 
   const handleSuggestionClick = (text) => {
     if (sendMessage.isPending) return;
-    const originSessionId = activeSessionId;
+    const originSessionId = activeSessionIdRef.current;
     sendMessage.mutate({ text, originSessionId });
   };
 
@@ -272,8 +314,8 @@ export default function Chat() {
         <ChatSessionSidebar
           sessions={sessions}
           activeId={activeSessionId}
-          onSelect={setActiveSessionId}
-          onNew={() => setActiveSessionId(null)}
+          onSelect={handleSelectSession}
+          onNew={handleNewChat}
           onDelete={handleDeleteSession}
           deletingSessionId={deleteSession.isPending ? deleteSession.variables : null}
         />
