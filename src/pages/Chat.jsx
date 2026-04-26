@@ -34,6 +34,9 @@ const getFriendlySendErrorMessage = (error) => {
 const isSessionNotFoundError = (error) =>
   (error?.message || '').toLowerCase().includes('session not found');
 
+const buildChatTitleFromPrompt = (text) =>
+  text.replace(/\s+/g, ' ').trim().slice(0, 50) || 'New Chat';
+
 function ChatSessionSidebar({ sessions, activeId, onSelect, onNew, onDelete, deletingSessionId }) {
   const normalizedActiveId = activeId != null ? String(activeId) : null;
   const normalizedDeletingId = deletingSessionId != null ? String(deletingSessionId) : null;
@@ -147,7 +150,7 @@ export default function Chat() {
     }).catch(() => {});
   }, []);
 
-  const { data: sessions = [] } = useQuery({
+  const { data: sessions = [], isFetching: isFetchingSessions } = useQuery({
     queryKey: ['chatSessions', user?.email],
     queryFn: () => user ? api.get('/api/chat/sessions') : [],
     enabled: !!user,
@@ -172,6 +175,8 @@ export default function Chat() {
 
   useEffect(() => {
     if (!activeSessionId || sessions.length === 0) return;
+    // Keep newly created chat selected while sessions are still refreshing.
+    if (isCreatingSession || isFetchingSessions || sessionCreationPromiseRef.current) return;
     const isActiveSessionValid = sessions.some((session) => String(session.id) === String(activeSessionId));
     if (!isActiveSessionValid) {
       updateActiveSessionId(null);
@@ -179,7 +184,7 @@ export default function Chat() {
         localStorage.removeItem(sessionStorageKey);
       }
     }
-  }, [activeSessionId, sessions, sessionStorageKey]);
+  }, [activeSessionId, sessions, sessionStorageKey, isCreatingSession, isFetchingSessions]);
 
   const { data: messages = [] } = useQuery({
     queryKey: ['chatMessages', activeSessionId],
@@ -193,9 +198,9 @@ export default function Chat() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, typingSessionId]);
 
-  const ensureSession = async (titleHint = 'New Chat') => {
+  const getOrCreateActiveSession = async ({ titleHint = 'New Chat', forceNew = false } = {}) => {
     const currentSessionId = activeSessionIdRef.current;
-    if (currentSessionId) return currentSessionId;
+    if (!forceNew && currentSessionId) return String(currentSessionId);
 
     if (sessionCreationPromiseRef.current) {
       return sessionCreationPromiseRef.current;
@@ -208,6 +213,7 @@ export default function Chat() {
         const createdId = String(session.id);
         updateActiveSessionId(createdId);
         queryClient.invalidateQueries({ queryKey: ['chatSessions', user?.email] });
+        queryClient.invalidateQueries({ queryKey: ['chatMessages', createdId] });
         return createdId;
       })
       .finally(() => {
@@ -219,8 +225,9 @@ export default function Chat() {
   };
 
   const sendMessage = useMutation({
-    mutationFn: async ({ text, originSessionId }) => {
-      const targetSessionId = originSessionId || await ensureSession(text);
+    mutationFn: async ({ text, originSessionId, retriedAfterSessionReset = false }) => {
+      const targetSessionId = originSessionId || await getOrCreateActiveSession({ titleHint: text });
+      const titleFromPrompt = buildChatTitleFromPrompt(text);
       await api.post(`/api/chat/sessions/${targetSessionId}/messages`, { role: 'user', message_text: text });
       queryClient.invalidateQueries({ queryKey: ['chatMessages', targetSessionId] });
       setTypingSessionId(String(targetSessionId));
@@ -235,17 +242,43 @@ export default function Chat() {
       });
 
       await api.post(`/api/chat/sessions/${targetSessionId}/messages`, { role: 'ai', message_text: response.message });
-      await api.put(`/api/chat/sessions/${targetSessionId}`, { last_message_preview: text.slice(0, 80) });
+      await api.put(`/api/chat/sessions/${targetSessionId}`, {
+        title: titleFromPrompt,
+        last_message_preview: text.slice(0, 80),
+      });
       return {
         targetSessionId: String(targetSessionId),
-        originSessionId: originSessionId ? String(originSessionId) : null
+        originSessionId: originSessionId ? String(originSessionId) : null,
+        retriedAfterSessionReset
       };
     },
     onSuccess: ({ targetSessionId }) => {
       queryClient.invalidateQueries({ queryKey: ['chatMessages', targetSessionId] });
       queryClient.invalidateQueries({ queryKey: ['chatSessions', user?.email] });
     },
-    onError: (error) => {
+    onError: async (error, variables) => {
+      if (isSessionNotFoundError(error) && !variables?.retriedAfterSessionReset) {
+        updateActiveSessionId(null);
+        setTypingSessionId(null);
+        if (sessionStorageKey) {
+          localStorage.removeItem(sessionStorageKey);
+        }
+        try {
+          const recoveredSessionId = await getOrCreateActiveSession({ titleHint: variables?.text || 'New Chat', forceNew: true });
+          sendMessage.mutate({
+            text: variables?.text || '',
+            originSessionId: recoveredSessionId,
+            retriedAfterSessionReset: true,
+          });
+          return;
+        } catch {
+          toast({
+            title: 'Message failed',
+            description: 'Could not recover chat session. Please try again.',
+          });
+          return;
+        }
+      }
       if (isSessionNotFoundError(error) && sessionStorageKey) {
         localStorage.removeItem(sessionStorageKey);
       }
@@ -305,17 +338,6 @@ export default function Chat() {
     sendMessage.mutate({ text, originSessionId });
   };
 
-  const handleInputFocus = () => {
-    if (!activeSessionIdRef.current && !isCreatingSession) {
-      ensureSession('New Chat').catch(() => {
-        toast({
-          title: 'Message failed',
-          description: 'Could not prepare chat session. Please try again.',
-        });
-      });
-    }
-  };
-
   const isTypingForActiveSession =
     typingSessionId != null && String(activeSessionId ?? '') === String(typingSessionId);
 
@@ -328,7 +350,7 @@ export default function Chat() {
           onSelect={handleSelectSession}
           onNew={() => {
             handleNewChat();
-            ensureSession('New Chat').catch(() => {
+            getOrCreateActiveSession({ titleHint: 'New Chat', forceNew: true }).catch(() => {
               toast({
                 title: 'Message failed',
                 description: 'Could not create a new chat. Please try again.',
@@ -425,7 +447,6 @@ export default function Chat() {
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                onFocus={handleInputFocus}
                 placeholder="Ask me anything about your skin..."
                 disabled={sendMessage.isPending || isCreatingSession}
                 className="flex-1 font-jost text-sm"

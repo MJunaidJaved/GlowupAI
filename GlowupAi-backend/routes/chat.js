@@ -96,13 +96,17 @@ router.put('/sessions/:sessionId', auth, (req, res) => {
 
   if (!session) return res.status(404).json({ error: 'Session not found' })
 
-  const { last_message_preview } = req.body
+  const { last_message_preview, title } = req.body
   db.prepare(`
     UPDATE chat_sessions SET
+      title = CASE
+        WHEN lower(trim(title)) = 'new chat' THEN COALESCE(?, title)
+        ELSE title
+      END,
       last_message_preview = COALESCE(?, last_message_preview),
       updated_at = datetime('now')
     WHERE id = ?
-  `).run(last_message_preview || null, req.params.sessionId)
+  `).run(title || null, last_message_preview || null, req.params.sessionId)
 
   res.json({ success: true })
 })

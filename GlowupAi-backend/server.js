@@ -3,7 +3,6 @@ require('dotenv').config()
 const express = require('express')
 const cors = require('cors')
 const helmet = require('helmet')
-const rateLimit = require('express-rate-limit')
 
 const app = express()
 
@@ -34,15 +33,8 @@ app.use(cors({
 // Parse JSON request bodies
 app.use(express.json())
 
-// Rate limiting on auth routes — max 20 requests per 15 minutes per IP
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 20,
-  message: { error: 'Too many requests, please try again later' }
-})
-
 // Mount all routes
-app.use('/api/auth', authLimiter, require('./routes/auth'))
+app.use('/api/auth', require('./routes/auth'))
 app.use('/api/skin-profile', require('./routes/skinProfile'))
 app.use('/api/chat', require('./routes/chat'))
 app.use('/api/glow-progress', require('./routes/glowProgress'))
