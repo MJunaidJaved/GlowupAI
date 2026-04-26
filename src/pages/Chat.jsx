@@ -10,6 +10,27 @@ import ChatBubble from '../components/chat/ChatBubble';
 import TypingIndicator from '../components/shared/TypingIndicator';
 import { toast } from '@/components/ui/use-toast';
 
+const getFriendlySendErrorMessage = (error) => {
+  const rawMessage = (error?.message || '').toLowerCase();
+
+  if (rawMessage.includes('session not found')) {
+    return 'This chat no longer exists. Please start or select another chat.';
+  }
+  if (rawMessage.includes('unauthorized') || rawMessage.includes('forbidden')) {
+    return 'Your session expired. Please log in again.';
+  }
+  if (rawMessage.includes('failed to fetch') || rawMessage.includes('networkerror')) {
+    return 'Network issue detected. Please check your internet and retry.';
+  }
+  if (rawMessage.includes('ai') || rawMessage.includes('openai') || rawMessage.includes('gemini')) {
+    return 'AI service is temporarily unavailable. Please try again shortly.';
+  }
+  if (error?.message) {
+    return error.message;
+  }
+  return 'Could not send message right now. Please try again.';
+};
+
 function ChatSessionSidebar({ sessions, activeId, onSelect, onNew, onDelete, deletingSessionId }) {
   const normalizedActiveId = activeId != null ? String(activeId) : null;
   const normalizedDeletingId = deletingSessionId != null ? String(deletingSessionId) : null;
@@ -185,10 +206,10 @@ export default function Chat() {
         });
       }
     },
-    onError: () => {
+    onError: (error) => {
       toast({
         title: 'Message failed',
-        description: 'Could not get AI response. Please try again.',
+        description: getFriendlySendErrorMessage(error),
       });
     },
     onSettled: () => {
